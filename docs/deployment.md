@@ -80,14 +80,14 @@ NOT end-to-end tested — no Google credentials exist in this environment.**
 cd backend
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home  # Mockito needs JDK 21
 APP_AUTH_DEV_MODE=true \
-APP_ADMIN_EMAIL='shb64178@gmail.com' APP_ADMIN_USERNAME='admin' APP_ADMIN_PASSWORD='qwerty@123456' \
+APP_ADMIN_EMAIL='<admin-email>' APP_ADMIN_USERNAME='admin' APP_ADMIN_PASSWORD='<admin-password>' \
 mvn spring-boot:run
 
 # frontend (:5173, /api proxied to :8080)
 cd frontend && npm install && npm run dev
 ```
 
-Test accounts (local TiDB): `admin`/`qwerty@123456` (ADMIN, rotate before any public exposure),
+Test accounts (local TiDB): `admin`/`<admin-password>` (ADMIN, rotate before any public exposure),
 `student@test.com`/`password123` (USER). Register → verify (dev token in response) → login.
 
 ## Admin password rotation (explicit local utility)

@@ -1,28 +1,23 @@
-# Java / Maven
+# Build output — `mvn package` recreates it
 target/
 *.class
 *.jar
 *.war
 
-# Spring Boot
+# Logs
 *.log
 
-# Env / secrets — never commit real credentials
+# Env / secrets — never commit real credentials (TIDB_*, JWT_SECRET,
+# SPRING_MAIL_*, GOOGLE_OAUTH_*, APP_ADMIN_* belong in hosting env only)
 .env
 *.env
 
-# Node / frontend
-node_modules/
-dist/
-dist-ssr/
-*.local
-
-# IDE
+# OS / IDE
+.DS_Store
 .idea/
 .vscode/
 *.iml
-.DS_Store
 
-# TiDB / certs
+# Certs
 *.pem
 *.crt
