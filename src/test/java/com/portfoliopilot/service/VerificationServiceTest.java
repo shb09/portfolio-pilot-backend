@@ -22,7 +22,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,10 +44,13 @@ class VerificationServiceTest {
 
     private VerificationService service;
 
+    @Mock
+    private com.portfoliopilot.security.JwtService jwtService;
+
     @BeforeEach
     void setUp() {
         service = new VerificationService(userRepository, passwordEncoder, mailService,
-                rateLimiter, 24, 60, true);
+                rateLimiter, jwtService, 24, 60, true);
     }
 
     private RegisterRequest req() {
@@ -56,18 +58,35 @@ class VerificationServiceTest {
     }
 
     @Test
-    void registerCreatesPendingAccountWithToken() {
+    void registerCreatesActiveAccountWithJwt() {
         when(userRepository.existsByUsername("asha-01")).thenReturn(false);
         when(userRepository.existsByEmail("asha@test.com")).thenReturn(false);
         when(passwordEncoder.encode("password1234")).thenReturn("hash");
-        when(mailService.isConfigured()).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(jwtService.generate("asha@test.com", com.portfoliopilot.entity.Role.USER)).thenReturn("jwt");
 
         var res = service.register(req());
 
-        assertTrue(res.verificationPending());
-        assertNotNull(res.devToken());
+        assertEquals("jwt", res.token());
+        assertEquals("asha-01", res.user().username());
+        assertTrue(res.user().emailVerified());
         verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void registerSurvivesMailOutage() {
+        when(userRepository.existsByUsername("asha-01")).thenReturn(false);
+        when(userRepository.existsByEmail("asha@test.com")).thenReturn(false);
+        when(passwordEncoder.encode("password1234")).thenReturn("hash");
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(jwtService.generate("asha@test.com", com.portfoliopilot.entity.Role.USER)).thenReturn("jwt");
+        org.mockito.Mockito.doThrow(new ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "down"))
+                .when(mailService).sendWelcome(anyString(), anyString());
+
+        var res = service.register(req());
+
+        assertEquals("jwt", res.token());
     }
 
     @Test

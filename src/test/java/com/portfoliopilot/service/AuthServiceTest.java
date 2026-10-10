@@ -98,15 +98,17 @@ class AuthServiceTest {
     }
 
     @Test
-    void unverifiedLoginRejected403() {
+    void legacyPendingAccountCanLogin() {
+        // Verification is no longer a login prerequisite: pre-change
+        // pending accounts must not be locked out.
         user.setEmailVerified(false);
         when(userRepository.findByUsername("asha")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+        when(jwtService.generate("asha@test.com", com.portfoliopilot.entity.Role.USER)).thenReturn("jwt");
 
-        var ex = assertThrows(ResponseStatusException.class,
-                () -> authService.login(new LoginRequest("asha", "pw12345678")));
-        assertEquals(403, ex.getStatusCode().value());
-        assertTrue(ex.getReason().contains("not verified"));
+        var res = authService.login(new LoginRequest("asha", "pw12345678"));
+
+        assertEquals("jwt", res.token());
     }
 
     @Test

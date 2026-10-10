@@ -1,13 +1,16 @@
 package com.portfoliopilot.service;
 
+import com.portfoliopilot.dto.AuthResponse;
 import com.portfoliopilot.dto.ForgotRequest;
 import com.portfoliopilot.dto.RegisterRequest;
 import com.portfoliopilot.dto.RegisterResponse;
 import com.portfoliopilot.dto.ResendRequest;
 import com.portfoliopilot.dto.ResetRequest;
+import com.portfoliopilot.dto.UserDto;
 import com.portfoliopilot.entity.Role;
 import com.portfoliopilot.entity.User;
 import com.portfoliopilot.repository.UserRepository;
+import com.portfoliopilot.security.JwtService;
 import com.portfoliopilot.security.RateLimiter;
 import com.portfoliopilot.security.TokenUtil;
 import org.slf4j.Logger;
@@ -35,6 +38,7 @@ public class VerificationService {
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
     private final RateLimiter rateLimiter;
+    private final JwtService jwtService;
     private final long verificationTtlHours;
     private final long resetTtlMinutes;
     private final boolean devMode;
@@ -43,6 +47,7 @@ public class VerificationService {
             PasswordEncoder passwordEncoder,
             MailService mailService,
             RateLimiter rateLimiter,
+            JwtService jwtService,
             @Value("${app.mail.verification-ttl-hours:24}") long verificationTtlHours,
             @Value("${app.mail.reset-ttl-minutes:60}") long resetTtlMinutes,
             @Value("${app.auth.dev-mode:false}") boolean devMode) {
@@ -50,14 +55,19 @@ public class VerificationService {
         this.passwordEncoder = passwordEncoder;
         this.mailService = mailService;
         this.rateLimiter = rateLimiter;
+        this.jwtService = jwtService;
         this.verificationTtlHours = verificationTtlHours;
         this.resetTtlMinutes = resetTtlMinutes;
         this.devMode = devMode;
     }
 
-    /** Creates a PENDING account (never authenticated) + sends verification. */
+    /**
+     * Creates an ACTIVE account and logs it in immediately: email verification
+     * is no longer a login prerequisite. A welcome email is attempted on a
+     * best-effort basis only — mail failures never fail registration.
+     */
     @Transactional
-    public RegisterResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request) {
         String username = request.username().trim().toLowerCase();
         String email = request.email().trim().toLowerCase();
         if (userRepository.existsByUsername(username)) {
@@ -72,15 +82,17 @@ public class VerificationService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(Role.USER);
-        user.setEmailVerified(false);
+        user.setEmailVerified(true);
         user.setEnabled(true);
-        String rawToken = TokenUtil.rawToken();
-        user.setVerificationTokenHash(TokenUtil.sha256(rawToken));
-        user.setVerificationExpiry(Instant.now().plusSeconds(verificationTtlHours * 3600));
-        userRepository.save(user);
-        log.info("Registered pending account username='{}'", username);
+        User saved = userRepository.save(user);
+        log.info("Registered account username='{}'", username);
 
-        return deliverVerification(user, rawToken);
+        try {
+            mailService.sendWelcome(saved.getEmail(), saved.getUsername());
+        } catch (ResponseStatusException e) {
+            log.warn("Welcome mail skipped for username='{}' (mail unavailable)", username);
+        }
+        return new AuthResponse(jwtService.generate(saved.getEmail(), saved.getRole()), UserDto.from(saved));
     }
 
     /** Single-use, expiring verification. Marks verified + confirms by mail. */

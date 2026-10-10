@@ -59,6 +59,15 @@ public class MailService {
         send(toEmail, "Your Portfolio Pilot account is ready", body);
     }
 
+    /** Best-effort welcome mail for immediate-login registration. */
+    public void sendWelcome(String toEmail, String username) {
+        String body = "Hi " + username + ",\n\n"
+                + "Welcome to Portfolio Pilot — your account is ready.\n"
+                + "Sign in any time with your username (" + username + ") or email address.\n\n"
+                + "— Portfolio Pilot";
+        send(toEmail, "Welcome to Portfolio Pilot", body);
+    }
+
     public void sendPasswordReset(String toEmail, String username, String rawToken, long ttlMinutes) {
         String link = baseUrl + "/reset?token=" + rawToken;
         String body = "Hi " + username + ",\n\n"

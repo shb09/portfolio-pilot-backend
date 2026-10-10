@@ -46,10 +46,8 @@ public class AuthService {
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account is disabled. Contact support.");
         }
-        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Email not verified. Check your inbox for the verification link, or request a new one.");
-        }
+        // Email verification is no longer a login prerequisite (legacy
+        // pending accounts included); verification remains optional.
         return new AuthResponse(jwtService.generate(user.getEmail(), user.getRole()), UserDto.from(user));
     }
 

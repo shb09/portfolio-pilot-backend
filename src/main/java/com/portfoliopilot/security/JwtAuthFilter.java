@@ -44,7 +44,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String email = jwtService.subject(token);
                 userRepository.findByEmail(email)
                         .filter(u -> Boolean.TRUE.equals(u.getEnabled()))
-                        .filter(u -> Boolean.TRUE.equals(u.getEmailVerified()))
                         .ifPresent(user -> {
                             Role role = user.getRole() == null ? Role.USER : user.getRole();
                             var auth = new UsernamePasswordAuthenticationToken(

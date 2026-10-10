@@ -45,10 +45,10 @@ public class AuthController {
         this.googleEnabled = googleClientId != null && !googleClientId.isBlank();
     }
 
-    /** Creates a PENDING account. Never returns a JWT. */
+    /** Creates an ACTIVE account and returns a JWT — login is immediate. */
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
+    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
         return verificationService.register(request);
     }
 
