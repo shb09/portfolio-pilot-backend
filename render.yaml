@@ -1,0 +1,40 @@
+# Render blueprint — Portfolio Pilot backend (Spring Boot + TiDB).
+# Import this repo in Render; it will propose the service below.
+# Secrets are NEVER stored here: entries with `sync: false` must be
+# filled in the Render dashboard (Environment tab).
+services:
+  - type: web
+    name: portfolio-pilot-api
+    runtime: java
+    buildCommand: mvn -q clean package -DskipTests
+    startCommand: java -jar target/portfolio-pilot-0.0.1-SNAPSHOT.jar
+    healthCheckPath: /api/health
+    envVars:
+      - key: JAVA_VERSION
+        value: 21
+      - key: TIDB_URL
+        value: jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/portfolio_pilot?sslMode=VERIFY_IDENTITY&serverTimezone=UTC
+      - key: TIDB_USER
+        sync: false
+      - key: TIDB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false # >= 32 chars, fresh value: openssl rand -hex 48
+      - key: APP_BASE_URL
+        sync: false # e.g. https://<vercel-app>.vercel.app
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false # same Vercel URL as above
+      - key: SPRING_MAIL_HOST
+        sync: false
+      - key: SPRING_MAIL_PORT
+        value: 587
+      - key: SPRING_MAIL_USERNAME
+        sync: false
+      - key: SPRING_MAIL_PASSWORD
+        sync: false
+      - key: APP_MAIL_FROM
+        value: Portfolio Pilot <no-reply@example.com>
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false # omit to run password-only
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
