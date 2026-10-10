@@ -1,17 +1,16 @@
-# Render blueprint — Portfolio Pilot backend (Spring Boot + TiDB).
+# Render blueprint — Portfolio Pilot backend (Spring Boot + TiDB, Docker).
 # Import this repo in Render; it will propose the service below.
 # Secrets are NEVER stored here: entries with `sync: false` must be
 # filled in the Render dashboard (Environment tab).
 services:
   - type: web
     name: portfolio-pilot-api
-    runtime: java
-    buildCommand: mvn -q clean package -DskipTests
-    startCommand: java -jar target/portfolio-pilot-0.0.1-SNAPSHOT.jar
+    runtime: docker
+    plan: free
     healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
-      - key: JAVA_VERSION
-        value: 21
       - key: TIDB_URL
         value: jdbc:mysql://gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000/portfolio_pilot?sslMode=VERIFY_IDENTITY&serverTimezone=UTC
       - key: TIDB_USER

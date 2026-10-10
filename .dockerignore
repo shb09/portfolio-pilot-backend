@@ -1,0 +1,7 @@
+# Keep the Docker build context lean (secrets never enter the image).
+.git/
+target/
+*.log
+.idea/
+.vscode/
+.DS_Store
