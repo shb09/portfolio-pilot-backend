@@ -46,6 +46,20 @@ public class AnalysisService {
     }
 
     public AnalysisDto analyze(String email, Long portfolioId) {
+        return analyze(email, portfolioId, null, null);
+    }
+
+    /**
+     * Same report restricted to an optional inclusive date window. The window
+     * filters the valued curve (returns, drawdown, benchmark alignment, and
+     * the returned series); valuation stays point-in-time at latest prices.
+     * Blank bounds are ignored; start after end is a 400.
+     */
+    public AnalysisDto analyze(String email, Long portfolioId, LocalDate start, LocalDate end) {
+        if (start != null && end != null && start.isAfter(end)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Start date must be on or before end date.");
+        }
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         FinPortfolio portfolio = portfolioRepository.findByIdAndUserId(portfolioId, user.getId())
@@ -65,13 +79,30 @@ public class AnalysisService {
 
         AnalysisDto.Valuation valuation = valuate(holdings, histories, warnings);
         List<PricePoint> curve = portfolioCurve(holdings, histories);
+        if (start != null || end != null) {
+            curve = curve.stream()
+                    .filter(p -> (start == null || !p.date().isBefore(start))
+                            && (end == null || !p.date().isAfter(end)))
+                    .toList();
+            if (curve.isEmpty()) {
+                warnings.add("No valued dates between "
+                        + (start == null ? "the beginning" : start)
+                        + " and " + (end == null ? "the latest date" : end) + ".");
+            }
+        }
+        Map<LocalDate, Double> benchmarkHistory =
+                benchmarkHistory(user.getId(), portfolio.getBenchmarkSymbol());
         AnalysisDto.ReturnsStats returns = returns(curve, warnings);
         AnalysisDto.Allocation allocation = allocate(valuation);
         AnalysisDto.BenchmarkComparison benchmark =
-                compareBenchmark(user.getId(), portfolio.getBenchmarkSymbol(), curve, warnings);
+                compareBenchmark(portfolio.getBenchmarkSymbol(), benchmarkHistory, curve, warnings);
+        List<AnalysisDto.SeriesPoint> series = curve.stream()
+                .map(p -> new AnalysisDto.SeriesPoint(p.date().toString(), p.close(),
+                        benchmarkHistory.get(p.date())))
+                .toList();
 
         return new AnalysisDto(portfolio.getId(), portfolio.getName(), valuation, returns,
-                allocation, benchmark, warnings);
+                allocation, benchmark, warnings, series);
     }
 
     private AnalysisDto.Valuation valuate(List<Holding> holdings,
@@ -166,27 +197,36 @@ public class AnalysisService {
         return new AnalysisDto.Allocation(weights, hhi, MetricsService.hhiBand(hhi));
     }
 
+    /** Benchmark closes by date (empty when unset or unimported). */
+    private Map<LocalDate, Double> benchmarkHistory(Long userId, String benchmarkSymbol) {
+        if (benchmarkSymbol == null || benchmarkSymbol.isBlank()) {
+            return Map.of();
+        }
+        String symbol = benchmarkSymbol.trim().toUpperCase();
+        List<AssetPrice> rows = priceRepository.findByUserIdAndSymbolOrderByPriceDate(userId, symbol);
+        Map<LocalDate, Double> byDate = new TreeMap<>();
+        for (AssetPrice row : rows) {
+            byDate.put(row.getPriceDate(), row.getClose());
+        }
+        return byDate;
+    }
+
     /**
      * Benchmark comparison on dates shared by both series: cumulative and
      * annualized returns over the identical window, active return, and
      * tracking error from paired daily differences.
      */
-    private AnalysisDto.BenchmarkComparison compareBenchmark(Long userId, String benchmarkSymbol,
-            List<PricePoint> curve, List<String> warnings) {
+    private AnalysisDto.BenchmarkComparison compareBenchmark(String benchmarkSymbol,
+            Map<LocalDate, Double> benchByDate, List<PricePoint> curve, List<String> warnings) {
         if (benchmarkSymbol == null || benchmarkSymbol.isBlank()) {
             return new AnalysisDto.BenchmarkComparison(null, 0, null, null, null, null,
                     "Set a benchmark symbol on the portfolio to enable comparison.");
         }
         String symbol = benchmarkSymbol.trim().toUpperCase();
-        List<AssetPrice> rows = priceRepository.findByUserIdAndSymbolOrderByPriceDate(userId, symbol);
-        if (rows.size() < 2) {
+        if (benchByDate.size() < 2) {
             warnings.add("No price history for benchmark " + symbol + " — import it to compare.");
             return new AnalysisDto.BenchmarkComparison(symbol, 0, null, null, null, null,
                     "Import price history for " + symbol + " to enable comparison.");
-        }
-        Map<LocalDate, Double> benchByDate = new TreeMap<>();
-        for (AssetPrice row : rows) {
-            benchByDate.put(row.getPriceDate(), row.getClose());
         }
         Map<LocalDate, Double> portByDate = MetricsService.toDateMap(curve);
         List<LocalDate> shared = portByDate.keySet().stream()

@@ -14,7 +14,11 @@ public record AnalysisDto(
         ReturnsStats returns,
         Allocation allocation,
         BenchmarkComparison benchmark,
-        List<String> warnings) {
+        List<String> warnings,
+        List<SeriesPoint> series) {
+
+    public record SeriesPoint(String date, Double value, Double benchmarkValue) {
+    }
 
     public record Position(String symbol, String assetCategory, Double quantity,
             Double lastPrice, String lastDate, Double value, Double weight) {
